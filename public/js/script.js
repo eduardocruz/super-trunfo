@@ -1,4 +1,3 @@
-// definindo um namespace para evitar conflito com outros objetos
 window.SUPERTRUNFO = window.SUPERTRUNFO || {};
 SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
 
@@ -6,7 +5,6 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
 
     SUPERTRUNFO.APPS.Jogo = function(options){
 
-        // cache de variáveis privadas
         var $screen = $('.screen'),
 
             $placarJogador = $('.score-me .score-number'),
@@ -33,8 +31,8 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
             $projetosVetadosJogador = $('.cards-yourturn [data-attribute="projs-vetados"] .card-label-value'),
             $projetosVetadosOponente = $('.cards-opponentsturn [data-attribute="projs-vetados"] .card-label-value'),
 
-            $fichaLimpaJogador = $('.cards-yourturn [data-attribute="ficha-limpa"] .card-label-value'),
-            $fichaLimpaOponente = $('.cards-opponentsturn [data-attribute="ficha-limpa"] .card-label-value'),
+            $escolaridadeJogador = $('.cards-yourturn [data-attribute="escolaridade"] .card-label-value'),
+            $escolaridadeOponente = $('.cards-opponentsturn [data-attribute="escolaridade"] .card-label-value'),
 
             $quantidadeVotosJogador = $('.cards-yourturn [data-attribute="qt-votos"] .card-label-value'),
             $quantidadeVotosOponente = $('.cards-opponentsturn [data-attribute="qt-votos"] .card-label-value'),
@@ -54,8 +52,11 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
             cartaAtualJogador,
             cartaAtualOponente,
 
+            modalSelecionada,
+
             isFeedbackTime,
-            isSuperTrunfo;
+            isSuperTrunfo,
+            isModalAberta = false;
 
         // define valores padrão caso não receba nenhum valor como parâmetro
         var defaults = {
@@ -67,32 +68,14 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
         // mescla do conteúdo dos dois objetos
         var settings = $.extend({}, defaults, options);
 
-        // console.log(options);
-        // console.log(defaults);
-        // console.log(settings);
+        var carregaCandidatos = function(cidadeEscolhida) {
 
-        var carregaCandidatos = function() {
-
-            $.getJSON('data/candidatos.json',function(result){
+            $.getJSON('data/' + cidadeEscolhida + '.json?v=3',function(result){
 
                 listaCandidatos = result.candidatos;
                 embaralhaCandidatos(listaCandidatos);
 
-                // espera 2s até mostrar a próxima tela
-                setTimeout(function() {
-
-                    // libera tela de jogo
-                    $screen.addClass('ready');
-                    $screen.addClass('turn');
-                    $('.ui-turns').fadeIn();
-
-                    // povoa cartas
-                    novaRodada();
-
-                    // libera eventos de clique
-                    bind();
-
-                }, 2000);
+                novaRodada();
 
             });
 
@@ -114,8 +97,6 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
             // armazena a opção escolhida pelo usuário e sua opção respectiva no oponente
             $('.card-label').on('click', function(e) {
 
-                // console.log(isFeedbackTime);
-
                 // caso não esteja exibindo o resultado da jogada passada
                 if (!isFeedbackTime) {
 
@@ -126,10 +107,7 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
                     if ($self.parent().parent().parent().hasClass('cards-yourturn')) {
 
                         atributoEscolhido = $self.data('attribute');
-                        // console.log('atributoEscolhido: ' + atributoEscolhido);
-
                         opcaoJogador = $self.find('.card-label-value').text();
-                        // console.log('opcaoJogador: ' + opcaoJogador);
 
                         // percorre todos os campos do oponente até encontrar aquele escolhido pelo jogador
                         $('.cards-opponentsturn .card-label').each(function (i, field) {
@@ -137,16 +115,22 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
                             if ($(field).data('attribute') == atributoEscolhido) {
                                 opcaoOponente = $(field).find('.card-label-value').text();
                                 $(field).addClass('selected');
-                                // console.log('opcaoOponente: ' + opcaoOponente);
                             }
 
                         });
 
-                        // se for um número, converter para base numérica
-                        if ($self.hasClass('vence-boolean') == false){
+                        // se for escolaridade, substituir o texto para número
+                        if (atributoEscolhido == "escolaridade") {
+                            opcaoJogador = escolaridade(opcaoJogador);
+                            opcaoOponente = escolaridade(opcaoOponente);
+                        } // se for um número, converter para base numérica
+                        else {
                             opcaoJogador = parseInt(opcaoJogador, 10);
                             opcaoOponente = parseInt(opcaoOponente, 10);
                         }
+
+                        console.log(opcaoJogador);
+                        console.log(opcaoOponente);
 
                     }
 
@@ -160,18 +144,92 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
 
             $('.vence-maior').on('click', venceMaior);
             $('.vence-menor').on('click', venceMenor);
-            $('.vence-boolean').on('click', venceBoolean);
 
-            // ao clicar no botão de informações
+            // ao clicar no botão de novo jogo
+            $('#escolha-cidade').on('submit', function(e) {
+
+                var cidadeEscolhida = $(this).find('option:selected').val();
+
+                // libera tela de jogo
+                $('.ui-turns').fadeIn();
+                $screen.addClass('turn');
+
+                // povoa cartas
+                carregaCandidatos(cidadeEscolhida);
+
+                e.preventDefault();
+
+            });
+
+            // ao clicar no botão de visualizar informações do atributo
+            $('.attribute-detail').on('click', function(e) {
+
+                if (!isModalAberta) {
+                    isModalAberta = true;
+                    modalSelecionada = $(this).parent().parent().data('attribute');
+                    $('.modal-' + modalSelecionada).slideToggle(300);
+
+                } else {
+                    isModalAberta = false;
+                    $('.modal-' + modalSelecionada).slideToggle(300);
+                }
+
+                e.stopPropagation();
+                e.preventDefault();
+
+            });
+
+            // esconde as modais ao clicar nelas mesmas
+            $('.modal').on('click', function() {
+                isModalAberta = false;
+                $(this).slideToggle(300);
+            });
+
+            // ao clicar no botão de informações do jogo
+            $('.link-about').on('click', function(e) {
+
+                if (!isModalAberta) {
+                    isModalAberta = true;
+                    modalSelecionada = "about";
+                    $('.modal-about').slideToggle(300);
+                } else {
+                    isModalAberta = false;
+                    $('.modal-' + modalSelecionada).slideToggle(300);
+                }
+
+                e.preventDefault();
+
+            });
+
+            // ao clicar no botão de informações da carta
             $('.view-info').on('click', function(e) {
                 $(this).parent().parent().toggleClass('card-info');
                 e.preventDefault();
             });
-            $('.link-about, .modal-about').on('click', function(e) {
-                $('.modal-about').slideToggle(300);
-                e.preventDefault();
-            });
 
+        },
+
+        escolaridade = function(opcao) {
+
+            if (opcao == "Não informado") { opcao = -1; }
+            else if (opcao == "Analfabeto") { opcao = 0; }
+            else if (opcao == "Lê e Escreve") { opcao = 1; }
+            else if (opcao == "Fundamental Incompleto") { opcao = 2; }
+            else if (opcao == "Fundamental Completo") { opcao = 3; }
+            else if (opcao == "Médio Incompleto") { opcao = 4; }
+            else if (opcao == "Médio Completo") { opcao = 5; }
+            else if (opcao == "Superior Incompleto") { opcao = 6; }
+            else if (opcao == "Superior Completo") { opcao = 7; }
+            else if (opcao == "Pós Graduado Incompleto") { opcao = 8; }
+            else if (opcao == "Pós Graduado Completa") { opcao = 9; }
+            else if (opcao == "Mestrado Incompleto") { opcao = 10; }
+            else if (opcao == "Mestrado Completo") { opcao = 11; }
+            else if (opcao == "Doutorado Incompleto") { opcao = 12; }
+            else if (opcao == "Doutorado Completo") { opcao = 13; }
+            else if (opcao == "PhD Incompleto") { opcao = 14; }
+            else if (opcao == "PhD Completo") { opcao = 15; }
+
+            return opcao;
         },
 
         superTrunfo = function() {
@@ -209,10 +267,6 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
 
         venceMaior = function() {
 
-            // console.log('vence maior');
-            // console.log(opcaoJogador);
-            // console.log(opcaoOponente);
-
             // caso não esteja exibindo o resultado da jogada passada
             if (!isFeedbackTime) {
 
@@ -220,13 +274,10 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
                 if (!isSuperTrunfo) {
 
                     if (opcaoJogador > opcaoOponente) {
-                        // console.log('opcaoJogador > opcaoOponente');
                         jogadorVenceu();
                     } else if (opcaoJogador == opcaoOponente) {
-                        // console.log('opcaoJogador == opcaoOponente');
                         empate();
                     } else {
-                        // console.log('opcaoJogador < opcaoOponente');
                         jogadorPerdeu();
                     }
 
@@ -238,10 +289,6 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
 
         venceMenor = function() {
 
-            // console.log('vence menor');
-            // console.log(opcaoJogador);
-            // console.log(opcaoOponente);
-
             // caso não esteja exibindo o resultado da jogada passada
             if (!isFeedbackTime) {
 
@@ -249,37 +296,8 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
                 if (!isSuperTrunfo) {
 
                     if (opcaoJogador < opcaoOponente) {
-                        // console.log('opcaoJogador < opcaoOponente');
                         jogadorVenceu();
                     } else if (opcaoJogador == opcaoOponente) {
-                        // console.log('opcaoJogador == opcaoOponente');
-                        empate();
-                    } else {
-                        // console.log('opcaoJogador > opcaoOponente');
-                        jogadorPerdeu();
-                    }
-
-                }
-
-            }
-
-        },
-
-        venceBoolean = function() {
-
-            // console.log('venceBoolean');
-            // console.log(opcaoJogador);
-            // console.log(opcaoOponente);
-
-            // caso não esteja exibindo o resultado da jogada passada
-            if (!isFeedbackTime) {
-
-                // se não for super trunfo
-                if (!isSuperTrunfo) {
-
-                    if (opcaoJogador == 'não' && opcaoOponente == 'sim') {
-                        jogadorVenceu();
-                    } else if ((opcaoJogador == 'sim' && opcaoOponente == 'sim') || (opcaoJogador == 'não' && opcaoOponente == 'não')) {
                         empate();
                     } else {
                         jogadorPerdeu();
@@ -366,20 +384,20 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
             setTimeout(function() {
                 atualizaPlacar();
                 novaRodada(result);
-            }, 3000);
+            }, 6000);
 
         },
 
         atualizaPlacar = function() {
-            $placarJogador.html('(' + settings.placarJogador + ')');
-            $placarOponente.html('(' + settings.placarOponente + ')');
+            $placarJogador.html(settings.placarJogador);
+            $placarOponente.html(settings.placarOponente);
 
             // fim de jogo
             if (settings.placarJogador == pontuacaoLimite) {
 
                 // exibe mensagem de vitória
                 $('.ui-final').addClass('ui-final-won');
-                $('.final').css("z-index", "10");
+                $('.final').css("display", "block").css("z-index", "10");
 
                 // aguarda 5 segundos até recomeçar o jogo
                 setTimeout(function() {
@@ -390,7 +408,7 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
 
                 // exibe mensagem de derrota
                 $('.ui-final').addClass('ui-final-lose');
-                $('.final').css("z-index", "10");
+                $('.final').css("display", "block").css("z-index", "10");
 
                 // aguarda 5 segundos até recomeçar o jogo
                 setTimeout(function() {
@@ -407,7 +425,8 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
             atualizaPlacar();
             embaralhaCandidatos(listaCandidatos);
             novaRodada();
-            $('.final').css("z-index", "1");
+
+            $('.final').css("display", "none").css("z-index", "1");
 
         },
 
@@ -434,28 +453,26 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
                 montaCartaOponente();
             }
 
-            // settings.rodada++;
-            // $rodada.html(settings.rodada);
-
-            // console.log('\ncomeça nova rodada\n');
-
-            // console.log(listaCandidatosJogador);
-            // console.log(listaCandidatosOponente);
         },
 
         montaCartaJogador = function(i) {
 
             cartaAtualJogador = listaCandidatosJogador[0];
-            // console.log(cartaAtualJogador);
 
             $idCartaJogador.text(cartaAtualJogador.id);
-            $nomeCartaJogador.text(cartaAtualJogador.nome);
-            $numCartaJogador.text(cartaAtualJogador.numero);
+            $nomeCartaJogador.text(cartaAtualJogador.nome).textFit({minFontSize: 17});
+
+            if (cartaAtualJogador.numero != null) {
+                $numCartaJogador.text(cartaAtualJogador.numero);
+            } else {
+                $numCartaJogador.text("");
+            }
+
             $fotoCartaJogador.html('<img src="' + cartaAtualJogador.foto + '" alt="' + cartaAtualJogador.nome + '" />');
             $partidoJogador.text(cartaAtualJogador.partido);
             $projetosAprovadosJogador.text(cartaAtualJogador.projetosAprovados);
             $projetosVetadosJogador.text(cartaAtualJogador.projetosVetados);
-            $fichaLimpaJogador.text(cartaAtualJogador.fichaLimpa);
+            $escolaridadeJogador.text(cartaAtualJogador.escolaridade);
             $quantidadeVotosJogador.text(cartaAtualJogador.quantidadeVotos);
             $bioCartaJogador.html(cartaAtualJogador.bio);
 
@@ -470,16 +487,21 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
         montaCartaOponente = function(i) {
 
             cartaAtualOponente = listaCandidatosOponente[0];
-            // console.log(cartaAtualOponente);
 
             $idCartaOponente.text(cartaAtualOponente.id);
-            $nomeCartaOponente.text(cartaAtualOponente.nome);
-            $numCartaOponente.text(cartaAtualOponente.numero);
+            $nomeCartaOponente.text(cartaAtualOponente.nome).textFit({minFontSize: 17});
+
+            if (cartaAtualOponente.numero != null) {
+                $numCartaOponente.text(cartaAtualOponente.numero);
+            } else {
+                $numCartaOponente.text("");
+            }
+
             $fotoCartaOponente.html('<img src="' + cartaAtualOponente.foto + '" alt="' + cartaAtualOponente.nome + '" />');
             $partidoOponente.text(cartaAtualOponente.partido);
             $projetosAprovadosOponente.text(cartaAtualOponente.projetosAprovados);
             $projetosVetadosOponente.text(cartaAtualOponente.projetosVetados);
-            $fichaLimpaOponente.text(cartaAtualOponente.fichaLimpa);
+            $escolaridadeOponente.text(cartaAtualOponente.escolaridade);
             $quantidadeVotosOponente.text(cartaAtualOponente.quantidadeVotos);
             $bioCartaOponente.html(cartaAtualOponente.bio);
 
@@ -515,7 +537,18 @@ SUPERTRUNFO.APPS = SUPERTRUNFO.APPS || {};
             init: function(){
                 pontuacaoLimite = settings.placarJogador + settings.placarOponente;
                 atualizaPlacar();
-                carregaCandidatos();
+
+                // espera 2s até mostrar a próxima tela
+                setTimeout(function() {
+
+                    // libera tela de jogo
+                    $screen.addClass('ready');
+
+                    // libera eventos de clique
+                    bind();
+
+                }, 2000);
+
             }
 
         };
